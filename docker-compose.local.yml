@@ -1,0 +1,59 @@
+version: '3'
+services:
+  cassandra:
+    image: cassandra:3.11
+    container_name: ddc_cassandra
+    ports:
+      - "9042:9042"
+    volumes:
+      - ./data/cassandra:/var/lib/cassandra  # Link volume to local data directory to prevent data loss
+    networks:
+      default:
+        ipv4_address: 172.18.0.162
+  statsd:
+    image: hopsoft/graphite-statsd
+    container_name: ddc_statsd
+    ports:
+      - "8188:80"
+      - "2003:2003"
+      - "8125:8125"
+      - "8126:8126"
+    networks:
+      default:
+        ipv4_address: 172.18.0.163
+  cadence:
+    image: ubercadence/server:0.9.5-auto-setup  # Update this version number if there are new versions release
+    container_name: ddc_cadence
+    ports:
+      - "7933:7933"
+      - "7934:7934"
+      - "7935:7935"
+      - "7939:7939"
+    environment:
+      - "CASSANDRA_SEEDS=cassandra"
+      - "STATSD_ENDPOINT=statsd:8125"
+      - "DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml"
+    depends_on:
+      - cassandra
+      - statsd
+    networks:
+      default:
+        ipv4_address: 172.18.0.161
+  cadence-web:
+    image: ubercadence/web:3.4.1
+    container_name: ddc_cadence_web
+    ports:
+      - "8088:8088"
+    depends_on:
+      - cadence
+    environment:
+      CADENCE_TCHANNEL_PEERS: "cadence:7933,172.18.0.161:7933"
+      VIRTUAL_HOST: "cadence.ddc.vm"
+      VIRTUAL_PORT: "8088"
+    networks:
+      default:
+        ipv4_address: 172.18.0.160
+networks:
+  default:
+    external:
+      name: dev
